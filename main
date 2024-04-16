@@ -1,0 +1,89 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Dataset
+datos = pd.read_csv('concentlite.csv', header=None)
+datos.columns = ['x1', 'x2', 'y']
+X = datos[['x1', 'x2']].values
+y = datos['y'].values
+
+# Red neuronal
+dimension_entrada = X.shape[1]
+capas_ocultas = [4, 3]
+dimension_salida = 1
+
+# Función de activación (sigmoide)
+def sigmoidal(x):
+    return 1 / (1 + np.exp(-x))
+
+def derivada_sigmoidal(x):
+    return x * (1 - x)
+
+# Pesos
+pesos = []
+capas = [dimension_entrada] + capas_ocultas + [dimension_salida]
+for i in range(len(capas) - 1):
+    w = np.random.randn(capas[i], capas[i+1])
+    pesos.append(w)
+
+# Clasificación y visualización
+def clasificacion_y_visualizacion(X, y, pesos, epoca):
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
+                         np.arange(y_min, y_max, 0.1))
+
+    Z = propagacion_adelante(np.c_[xx.ravel(), yy.ravel()], pesos)[-1]
+    Z = Z.reshape(xx.shape)
+
+    plt.contourf(xx, yy, Z, alpha=0.4)
+    plt.scatter(X[:, 0], X[:, 1], c=y, s=20, edgecolor='k')
+    plt.title(f'Iteración {epoca}')
+    plt.draw()
+    plt.pause(0.1)
+
+# Propagación hacia adelante
+def propagacion_adelante(X, pesos):
+    activaciones = [X]
+    for w in pesos:
+        z = np.dot(activaciones[-1], w)
+        a = sigmoidal(z)
+        activaciones.append(a)
+    return activaciones
+
+# Retropropagación
+def retropropagacion(X, y, pesos, activaciones):
+    delta_pesos = []
+    error = y - activaciones[-1]
+    delta = error * derivada_sigmoidal(activaciones[-1])
+    for i in range(len(pesos)-1, -1, -1):
+        delta_pesos.insert(0, np.dot(activaciones[i].T, delta))
+        if i > 0:
+            delta = np.dot(delta, pesos[i].T) * derivada_sigmoidal(activaciones[i])
+    return delta_pesos
+
+def actualizar_pesos(pesos, delta_pesos, tasa_aprendizaje):
+    for i in range(len(pesos)):
+        pesos[i] += tasa_aprendizaje * delta_pesos[i]
+    return pesos
+
+# Entrenamiento
+epocas = 1000
+tasa_aprendizaje = 0.1
+fig = plt.figure()
+for epoca in range(epocas):
+    activaciones = propagacion_adelante(X, pesos)
+    delta_pesos = retropropagacion(X, y.reshape(-1, 1), pesos, activaciones)
+    pesos = actualizar_pesos(pesos, delta_pesos, tasa_aprendizaje)
+    
+    if (epoca + 1) % 50 == 0:
+        clasificacion_y_visualizacion(X, y, pesos, epoca + 1)
+
+plt.show()
+
+
+print("Pesos finales:")
+for i, w in enumerate(pesos):
+    print(f"Pesos de la capa {i + 1}:")
+    print(w)
